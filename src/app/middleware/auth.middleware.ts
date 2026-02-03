@@ -11,19 +11,19 @@ export interface AuthRequest extends Request {
 }
 
 export function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new UnauthorizedError("Missing or invalid authorization header");
-  }
-
-  const token = authHeader.substring(7);
-  
   try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new UnauthorizedError("Missing or invalid authorization header");
+    }
+
+    const token = authHeader.substring(7);
+    
     const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as { sub: string; email: string };
     req.user = payload;
     next();
   } catch (error) {
-    throw new UnauthorizedError("Invalid or expired token");
+    next(error);
   }
 }
