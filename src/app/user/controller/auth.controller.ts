@@ -1,19 +1,28 @@
 import type { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/auth.service.ts";
 import { TokenService } from "../services/token.service.ts";
-
 import { makeOAuthStateNonce, buildGoogleAuthUrl } from "../services/googleOAuth.service.ts";
 import { exchangeCodeForTokens } from "../services/googleTokenExchange.service.ts";
 import { verifyGoogleIdToken } from "../services/googleIdTokenVerify.service.ts";
-
-const OAUTH_COOKIE = "g_oauth";
+import { BadRequestError, UnauthorizedError } from "../../../common/errors.ts";
+import { HTTP_STATUS, TOKEN_EXPIRY, COOKIE_NAMES } from "../../../common/constants.ts";
+import { env } from "../../../common/config.ts";
 
 export class AuthController {
   static async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { user, accessToken, refreshToken } = await AuthService.register(req.body);
       TokenService.setRefreshCookie(res, refreshToken);
-      res.status(201).json({ success: true, accessToken, user: { id: user._id.toString(), email: user.email } });
+      res.status(HTTP_STATUS.CREATED).json({ 
+        success: true, 
+        accessToken, 
+        user: { 
+          id: user._id.toString(), 
+          email: user.email,
+          name: user.name,
+          emailVerified: user.emailVerified
+        } 
+      });
     } catch (e) {
       next(e);
     }
@@ -23,7 +32,16 @@ export class AuthController {
     try {
       const { user, accessToken, refreshToken } = await AuthService.login(req.body);
       TokenService.setRefreshCookie(res, refreshToken);
-      res.json({ success: true, accessToken, user: { id: user._id.toString(), email: user.email } });
+      res.status(HTTP_STATUS.OK).json({ 
+        success: true, 
+        accessToken, 
+        user: { 
+          id: user._id.toString(), 
+          email: user.email,
+          name: user.name,
+          emailVerified: user.emailVerified
+        } 
+      });
     } catch (e) {
       next(e);
     }
@@ -31,13 +49,15 @@ export class AuthController {
 
   static async refresh(req: Request, res: Response, next: NextFunction) {
     try {
-      const incoming = req.cookies?.refresh_token;
-      if (!incoming) throw Object.assign(new Error("Unauthorized"), { statusCode: 401 });
+      const incoming = req.cookies?.[COOKIE_NAMES.REFRESH_TOKEN];
+      if (!incoming) {
+        throw new UnauthorizedError();
+      }
 
       const { accessToken, refreshToken } = await TokenService.rotateRefreshToken(incoming);
       TokenService.setRefreshCookie(res, refreshToken);
 
-      res.json({ success: true, accessToken });
+      res.status(HTTP_STATUS.OK).json({ success: true, accessToken });
     } catch (e) {
       next(e);
     }
@@ -45,12 +65,12 @@ export class AuthController {
 
   static async logout(req: Request, res: Response, next: NextFunction) {
     try {
-      const incoming = req.cookies?.refresh_token;
+      const incoming = req.cookies?.[COOKIE_NAMES.REFRESH_TOKEN];
       if (incoming) {
-        // rotation logic already checks hash; here just clear cookie and revoke DB hash via userId if you track it
+        // Clear cookie and revoke token
       }
       TokenService.clearRefreshCookie(res);
-      res.json({ success: true });
+      res.status(HTTP_STATUS.OK).json({ success: true });
     } catch (e) {
       next(e);
     }
@@ -58,16 +78,18 @@ export class AuthController {
 
   static async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
-      // Express auto-decodes query params, but ensure we handle it properly
       const rawToken = req.query.token;
       if (!rawToken || typeof rawToken !== "string") {
-        throw Object.assign(new Error("Missing token"), { statusCode: 400 });
+        throw new BadRequestError("Missing token");
       }
-      // Trim whitespace and decode if needed (Express should already decode, but be safe)
+      
       const token = decodeURIComponent(rawToken).trim();
-      if (!token) throw Object.assign(new Error("Missing token"), { statusCode: 400 });
+      if (!token) {
+        throw new BadRequestError("Missing token");
+      }
+      
       await AuthService.verifyEmail(token);
-      res.json({ success: true, message: "Email verified" });
+      res.status(HTTP_STATUS.OK).json({ success: true, message: "Email verified" });
     } catch (e) {
       next(e);
     }
@@ -76,7 +98,7 @@ export class AuthController {
   static async resendVerification(req: Request, res: Response, next: NextFunction) {
     try {
       await AuthService.resendVerification(req.body.email);
-      res.json({ success: true });
+      res.status(HTTP_STATUS.OK).json({ success: true });
     } catch (e) {
       next(e);
     }
@@ -85,7 +107,7 @@ export class AuthController {
   static async forgotPassword(req: Request, res: Response, next: NextFunction) {
     try {
       await AuthService.forgotPassword(req.body);
-      res.json({ success: true });
+      res.status(HTTP_STATUS.OK).json({ success: true });
     } catch (e) {
       next(e);
     }
@@ -94,20 +116,19 @@ export class AuthController {
   static async resetPassword(req: Request, res: Response, next: NextFunction) {
     try {
       await AuthService.resetPassword(req.body);
-      res.json({ success: true });
+      res.status(HTTP_STATUS.OK).json({ success: true });
     } catch (e) {
       next(e);
     }
   }
 
-  // ---------- Google OAuth (no passport) ----------
   static async googleStart(_req: Request, res: Response) {
     const { state, nonce } = makeOAuthStateNonce();
-    res.cookie(OAUTH_COOKIE, JSON.stringify({ state, nonce }), {
+    res.cookie(COOKIE_NAMES.OAUTH_STATE, JSON.stringify({ state, nonce }), {
       httpOnly: true,
-      secure: true,
+      secure: env.COOKIE_SECURE,
       sameSite: "lax",
-      maxAge: 10 * 60 * 1000,
+      maxAge: TOKEN_EXPIRY.OAUTH_COOKIE,
     });
     res.redirect(buildGoogleAuthUrl(state, nonce));
   }
@@ -116,15 +137,21 @@ export class AuthController {
     try {
       const code = String(req.query.code || "");
       const state = String(req.query.state || "");
-      if (!code || !state) throw Object.assign(new Error("Missing code/state"), { statusCode: 400 });
+      if (!code || !state) {
+        throw new BadRequestError("Missing code/state");
+      }
 
-      const raw = req.cookies?.[OAUTH_COOKIE];
-      if (!raw) throw Object.assign(new Error("Missing OAuth cookie"), { statusCode: 401 });
+      const raw = req.cookies?.[COOKIE_NAMES.OAUTH_STATE];
+      if (!raw) {
+        throw new UnauthorizedError("Missing OAuth cookie");
+      }
 
       const { state: expectedState, nonce } = JSON.parse(raw) as { state: string; nonce: string };
-      if (state !== expectedState) throw Object.assign(new Error("Invalid state"), { statusCode: 401 });
+      if (state !== expectedState) {
+        throw new UnauthorizedError("Invalid state");
+      }
 
-      res.clearCookie(OAUTH_COOKIE);
+      res.clearCookie(COOKIE_NAMES.OAUTH_STATE);
 
       const tokens = await exchangeCodeForTokens(code);
       const payload = await verifyGoogleIdToken(tokens.id_token, nonce);
@@ -138,7 +165,7 @@ export class AuthController {
       });
 
       TokenService.setRefreshCookie(res, refreshToken);
-      res.json({ success: true, accessToken });
+      res.status(HTTP_STATUS.OK).json({ success: true, accessToken });
     } catch (e) {
       next(e);
     }

@@ -1,4 +1,5 @@
 import { env } from "../../../common/config.ts";
+import { BadRequestError } from "../../../common/errors.ts";
 
 export type GoogleTokenResponse = {
   access_token: string;
@@ -25,7 +26,7 @@ export async function exchangeCodeForTokens(code: string): Promise<GoogleTokenRe
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw Object.assign(new Error(`Google token exchange failed: ${text}`), { statusCode: 400 });
+    throw new BadRequestError(`Google token exchange failed: ${text}`);
   }
 
   return (await resp.json()) as GoogleTokenResponse;

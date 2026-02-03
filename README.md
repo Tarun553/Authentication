@@ -66,3 +66,124 @@ After **Login**, **Register**, or **Google callback**, you get an `accessToken`.
 - Add header: **Authorization**: `Bearer <accessToken>`.
 
 This collection does not include protected routes; add them and use the same header when you implement them.
+
+---
+
+## Code Architecture & Patterns
+
+This codebase follows modern Node.js/TypeScript best practices for improved maintainability and scalability.
+
+### 📁 Project Structure
+
+```
+src/
+├── common/                  # Shared utilities and configuration
+│   ├── constants.ts         # Application-wide constants (TOKEN_EXPIRY, HTTP_STATUS, etc.)
+│   ├── errors.ts            # Custom error classes (AppError, UnauthorizedError, etc.)
+│   ├── config.ts            # Environment validation with Zod
+│   ├── crypto.ts            # Cryptographic utilities
+│   ├── jwt.ts               # JWT token operations
+│   ├── db.ts                # Database connection
+│   └── mailer.ts            # Email service configuration
+├── app/
+│   ├── middleware/
+│   │   ├── error.middleware.ts    # Global error handler
+│   │   ├── logger.middleware.ts   # Request logging
+│   │   ├── auth.middleware.ts     # JWT authentication
+│   │   └── validate.middleware.ts # Request validation
+│   └── user/
+│       ├── controller/
+│       │   └── auth.controller.ts # HTTP request handlers
+│       ├── services/
+│       │   ├── auth.service.ts    # Business logic
+│       │   ├── token.service.ts   # Token management
+│       │   ├── mail.service.ts    # Email operations
+│       │   └── google*.service.ts # Google OAuth services
+│       ├── repositories/
+│       │   └── user.repository.ts # Database operations
+│       ├── dto/
+│       │   ├── auth.dto.ts        # Request DTOs
+│       │   └── response.dto.ts    # Response DTOs
+│       ├── validations/
+│       │   ├── user.model.ts      # Mongoose model
+│       │   └── user.types.ts      # TypeScript types
+│       └── user.routes.ts         # Route definitions
+└── server.ts                # Express app setup
+```
+
+### 🎯 Key Design Patterns
+
+#### 1. **Repository Pattern**
+Database operations are abstracted into the `UserRepository` class:
+- Centralized data access logic
+- Easy to test and mock
+- Consistent query patterns
+
+```typescript
+// Instead of: User.findOne({ email })
+// Use: UserRepository.findByEmail(email)
+```
+
+#### 2. **Custom Error Classes**
+Type-safe error handling with proper HTTP status codes:
+```typescript
+throw new UnauthorizedError();           // 401
+throw new BadRequestError("message");    // 400
+throw new ConflictError("message");      // 409
+throw new ForbiddenError("message");     // 403
+```
+
+#### 3. **Constants File**
+All magic numbers and repeated values centralized:
+```typescript
+TOKEN_EXPIRY.EMAIL_VERIFY     // 1 hour
+TOKEN_EXPIRY.PASSWORD_RESET   // 30 minutes
+BCRYPT_ROUNDS                 // 10
+COOKIE_NAMES.REFRESH_TOKEN    // "refresh_token"
+```
+
+#### 4. **Environment Validation**
+Zod schema validates environment variables on startup:
+- Fails fast with clear error messages
+- Type-safe configuration access
+- Default values for optional settings
+
+#### 5. **Service Layer**
+Business logic separated from HTTP handling:
+- `AuthService`: User authentication operations
+- `TokenService`: JWT token management
+- `MailService`: Email notifications
+
+#### 6. **DTOs (Data Transfer Objects)**
+Type-safe request and response interfaces:
+- Clear API contracts
+- Better IDE support
+- Runtime validation with Zod
+
+### 🔒 Security Features
+
+- **Environment validation** catches misconfigurations early
+- **Custom error classes** prevent information leakage
+- **Repository pattern** helps prevent SQL injection
+- **HTTP-only cookies** for refresh tokens
+- **Token rotation** on refresh
+- **Password hashing** with bcrypt
+- **Email verification** for new accounts
+- **Secure password reset** flow
+
+### 🛠 Benefits
+
+1. **Readability**: Named constants and small focused functions
+2. **Maintainability**: Changes isolated to specific layers
+3. **Type Safety**: Strong TypeScript usage throughout
+4. **Debugging**: Request logger tracks all HTTP requests
+5. **Testability**: Repository pattern and service layer easy to test
+6. **Consistency**: Uniform error handling and response patterns
+7. **Security**: Environment validation and proper error handling
+
+### 📝 Development Notes
+
+- No functional API changes—all existing endpoints work as before
+- Backward compatible with previous implementation
+- Code quality improvements only
+- Foundation for future enhancements (rate limiting, caching, etc.)

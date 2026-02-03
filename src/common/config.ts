@@ -1,24 +1,31 @@
-export const env = {
-    PORT: Number(process.env.PORT || 3000),
-    MONGO_URI: process.env.MONGO_URI!,
-  
-    JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET!,
-    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET!,
-    ACCESS_TOKEN_TTL: process.env.ACCESS_TOKEN_TTL || "15m",
-    REFRESH_TOKEN_TTL: process.env.REFRESH_TOKEN_TTL || "7d",
-  
-    APP_URL: process.env.APP_URL || "http://localhost:3000",
-  
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
-    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
-    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL!,
-  
-    COOKIE_SECURE: process.env.COOKIE_SECURE === "true",
-  
-    SMTP_HOST: process.env.SMTP_HOST!,
-    SMTP_PORT: Number(process.env.SMTP_PORT || 587),
-    SMTP_USER: process.env.SMTP_USER!,
-    SMTP_PASS: process.env.SMTP_PASS!,
-    MAIL_FROM: process.env.MAIL_FROM || "no-reply@example.com",
-  };
+import { z } from "zod";
+
+const envSchema = z.object({
+  PORT: z.coerce.number().default(3000),
+  MONGO_URI: z.string().min(1, "MONGO_URI is required"),
+  JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+  ACCESS_TOKEN_TTL: z.string().default("15m"),
+  REFRESH_TOKEN_TTL: z.string().default("7d"),
+  APP_URL: z.string().url().default("http://localhost:3000"),
+  GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
+  GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
+  GOOGLE_CALLBACK_URL: z.string().url(),
+  COOKIE_SECURE: z.string().default("false").transform(val => val === "true"),
+  SMTP_HOST: z.string().min(1, "SMTP_HOST is required"),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().min(1, "SMTP_USER is required"),
+  SMTP_PASS: z.string().min(1, "SMTP_PASS is required"),
+  MAIL_FROM: z.string().email().default("no-reply@example.com"),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error("❌ Invalid environment variables:");
+  console.error(parsed.error.flatten().fieldErrors);
+  process.exit(1);
+}
+
+export const env = parsed.data;
   
