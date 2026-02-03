@@ -1,0 +1,128 @@
+{
+  "info": {
+    "name": "Auth API",
+    "description": "Collection to test Auth API endpoints. Set `baseUrl` to http://localhost:3000 (or your server URL).\n\n**Google Auth:** Use the \"Google OAuth - Start (open in browser)\" request URL in your browser to start the flow; after login Google redirects to your callback and you get the accessToken in the response.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health",
+        "description": "Check if the server is running."
+      }
+    },
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"Test User\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/register",
+        "description": "Register a new user. Password must be 8-100 chars. Name is optional."
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login",
+        "description": "Login. Returns accessToken and sets refresh_token cookie. Email must be verified for local accounts."
+      }
+    },
+    {
+      "name": "Auth - Refresh",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/auth/refresh",
+        "description": "Get a new accessToken using the refresh_token cookie (set by login/register). In Postman: enable 'Cookies' in the request or use Cookie header."
+      }
+    },
+    {
+      "name": "Auth - Logout",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/auth/logout",
+        "description": "Logout. Clears the refresh_token cookie."
+      }
+    },
+    {
+      "name": "Auth - Verify Email",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/auth/verify-email?token=YOUR_VERIFICATION_TOKEN",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "verify-email"],
+          "query": [{ "key": "token", "value": "YOUR_VERIFICATION_TOKEN", "description": "Token from verification email link" }]
+        },
+        "description": "Verify email using the token from the verification email link."
+      }
+    },
+    {
+      "name": "Auth - Resend Verification",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/resend-verification",
+        "description": "Resend the verification email."
+      }
+    },
+    {
+      "name": "Auth - Forgot Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/forgot-password",
+        "description": "Request a password reset email."
+      }
+    },
+    {
+      "name": "Auth - Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"RESET_TOKEN_FROM_EMAIL\",\n  \"newPassword\": \"newpassword123\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/reset-password",
+        "description": "Reset password using token from forgot-password email. Token min 10 chars, newPassword 8-100 chars."
+      }
+    },
+    {
+      "name": "Google OAuth - Start (open in browser)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/auth/google",
+        "description": "Google login: open this URL in a browser (not in Postman). You will be redirected to Google, then back to /auth/google/callback. The callback returns JSON with accessToken. For local testing, open: http://localhost:3000/auth/google"
+      }
+    }
+  ]
+}
