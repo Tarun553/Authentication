@@ -1,6 +1,9 @@
 import { User } from "../validations/user.model.ts";
 import { sha256 } from "../../../common/crypto.ts";
 import type { UserDocShape } from "../validations/user.types.ts";
+import type { Document } from "mongoose";
+
+type UserDocument = Document & UserDocShape;
 
 export class UserRepository {
   static async findByEmail(email: string) {
@@ -36,7 +39,7 @@ export class UserRepository {
     return User.updateOne({ _id: userId }, { refreshTokenHash: tokenHash });
   }
 
-  static async save(user: UserDocShape) {
+  static async save(user: UserDocument) {
     return user.save();
   }
 }

@@ -7,10 +7,13 @@ import { ConflictError, UnauthorizedError, ForbiddenError, BadRequestError } fro
 import { TOKEN_EXPIRY, BCRYPT_ROUNDS } from "../../../common/constants.ts";
 import type { GoogleLoginInput, RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from "../dto/auth.dto.ts";
 import type { UserDocShape } from "../validations/user.types.ts";
+import type { Document } from "mongoose";
+
+type UserDocument = Document & UserDocShape;
 
 export class AuthService {
   // Helper methods
-  private static async generateEmailVerificationToken(user: UserDocShape) {
+  private static async generateEmailVerificationToken(user: UserDocument) {
     const verifyToken = randomToken(32);
     user.emailVerifyTokenHash = sha256(verifyToken);
     user.emailVerifyExpires = new Date(Date.now() + TOKEN_EXPIRY.EMAIL_VERIFY);
@@ -18,7 +21,7 @@ export class AuthService {
     return verifyToken;
   }
 
-  private static async generatePasswordResetToken(user: UserDocShape) {
+  private static async generatePasswordResetToken(user: UserDocument) {
     const resetToken = randomToken(32);
     user.resetPasswordTokenHash = sha256(resetToken);
     user.resetPasswordExpires = new Date(Date.now() + TOKEN_EXPIRY.PASSWORD_RESET);
@@ -38,7 +41,7 @@ export class AuthService {
     });
   }
 
-  private static issueAuthTokens(user: UserDocShape) {
+  private static issueAuthTokens(user: UserDocument) {
     const { accessToken, refreshToken } = TokenService.issueTokens(user._id.toString(), user.email);
     return { accessToken, refreshToken };
   }

@@ -11,7 +11,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
   GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
   GOOGLE_CALLBACK_URL: z.string().url(),
-  COOKIE_SECURE: z.enum(["true", "false"]).transform(val => val === "true").default("false"),
+  COOKIE_SECURE: z.string().default("false").transform(val => val === "true"),
   SMTP_HOST: z.string().min(1, "SMTP_HOST is required"),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().min(1, "SMTP_USER is required"),
